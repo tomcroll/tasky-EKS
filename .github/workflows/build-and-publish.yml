@@ -78,3 +78,31 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Docker Scout vulnerability scanning
+      - name: Docker Scout Vulnerability Scanning
+        uses: docker/scout-action@v1
+        # Deliberate security misconfiguration: Using continue-on-error to allow the workflow to proceed despite vulnerabilities
+        continue-on-error: true
+        with:
+          command: cves
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          # Deliberate security misconfiguration: Setting only-severities to high allows critical issues to pass
+          only-severities: high
+
+      # Generate Software Bill of Materials (SBOM)
+      - name: Generate SBOM
+        uses: docker/scout-action@v1
+        with:
+          command: sbom
+          image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}
+          output: tasky-sbom.json
+          format: json
+
+      # Upload SBOM as an artifact
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: tasky-sbom
+          path: tasky-sbom.json
+          retention-days: 90
