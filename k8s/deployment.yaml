@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasky
+  namespace: tasky
+  labels:
+    app: tasky
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tasky
+  template:
+    metadata:
+      labels:
+        app: tasky
+    spec:
+      serviceAccountName: tasky-admin
+      securityContext:
+        privileged: true
+      containers:
+      - name: tasky
+        image: ${ECR_REPOSITORY}:${IMAGE_TAG}
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: MONGODB_URI
+          value: "mongodb://admin:password123@44.222.143.165:27017/admin"
+        securityContext:
+          runAsUser: 0
+        volumeMounts:
+        - name: wizexercise-volume
+          mountPath: /app/wizexercise.txt
+          subPath: wizexercise.txt
+      volumes:
+      - name: wizexercise-volume
+        configMap:
+          name: wizexercise-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: wizexercise-config
+  namespace: tasky
+data:
+  wizexercise.txt: |
+    This file is required for the Wiz GitOps Challenge.
+    It contains deliberately insecure configuration for demonstration purposes.

@@ -1,71 +1,80 @@
-name: webapp-actions
+name: Deploy to EKS
+
 on:
-  push:
+  workflow_run:
+    workflows: ["Build and Publish Docker Image"]
+    types:
+      - completed
     branches: ['main']
+
 env:
-  AWS_REGION: ${{ vars.AWS_REGION }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
-  EKS_CLUSTER: ${{ vars.EKS_CLUSTER }}
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: ${{ github.repository }}
+  EKS_CLUSTER: wiz-gitops-wiz-challenge-eks
+  IMAGE_TAG: ${{ github.sha }}
+  REGISTRY: docker.io
 
 jobs:
-  BuildandPush:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Code checkout
-        uses: actions/checkout@v4
-    
-      - name: Build & Upload image to ECR
-        uses: appleboy/docker-ecr-action@master
-        with:
-         access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
-         secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-         registry: ${{ secrets.REGISTRY }}
-         repo: ${{ env.ECR_REPOSITORY }}
-         region: ${{ env.AWS_REGION }}
-         tags: ${{ github.run_number }}
-         daemon_off: false
-         dockerfile: ./Dockerfile
-         context: ./
   DeployToEKS:
-    needs: BuildandPush
     runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     steps:
-        - name: Checkout source code
-          uses: actions/checkout@v4
+      - name: Checkout source code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
-        - name: Configure AWS credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws-region: ${{ env.AWS_REGION }}
-        
-        - name: Get Kubernetes config
-          id: getconfig
-          run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+      
+      # Check if we should use ECR based on secrets
+      - name: Check if AWS credentials are available
+        id: check-aws
+        run: |
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ] && [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            echo "use_aws=true" >> $GITHUB_OUTPUT
+          else
+            echo "use_aws=false" >> $GITHUB_OUTPUT
+          fi
+          
+      # Set registry to ECR if using AWS
+      - name: Set ECR registry
+        if: steps.check-aws.outputs.use_aws == 'true'
+        run: |
+          account_id=$(aws sts get-caller-identity --query Account --output text)
+          echo "REGISTRY=${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+      
+      - name: Get Kubernetes config
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
 
-        - name: Login to ECR
-          run: |
-            kubectl get secret regcred || \
-            kubectl create secret docker-registry regcred \
-              --docker-server=${{ secrets.REGISTRY }} \
-              --docker-username=AWS \
-              --docker-password=$(aws ecr get-login-password)
+      - name: Create tasky namespace if not exists
+        run: kubectl create namespace tasky --dry-run=client -o yaml | kubectl apply -f -
 
-        - name: Deploy with Helm
-          uses: bitovi/github-actions-deploy-eks-helm@v1.2.12
-          with:
-            aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-            aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-            aws-region: ${{ env.AWS_REGION }}
-            cluster-name: ${{ env.EKS_CLUSTER }}
-            chart-path: helm/appcharts
-            namespace: default
-            values: appimage=${{ secrets.REGISTRY }}/${{ env.ECR_REPOSITORY }},apptag=${{ github.run_number }}
-            name: webapp-stack
-        
-        - name: Show Pods
-          run: kubectl get pod -A
-        
-        - name: Show SVC
-          run: kubectl get ingress
+      - name: Update image placeholders in manifests
+        run: |
+          sed -i "s|\${ECR_REPOSITORY}|${{ env.REGISTRY }}/${{ env.ECR_REPOSITORY }}|g" k8s/deployment.yaml
+          sed -i "s|\${IMAGE_TAG}|${{ env.IMAGE_TAG }}|g" k8s/deployment.yaml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f k8s/namespace.yaml
+          kubectl apply -f k8s/rbac.yaml
+          kubectl apply -f k8s/deployment.yaml
+          kubectl apply -f k8s/service.yaml
+      
+      - name: Verify deployment
+        run: |
+          kubectl rollout status deployment/tasky -n tasky
+      
+      - name: Show resources
+        run: |
+          echo "Pods:"
+          kubectl get pods -n tasky
+          echo "Services:"
+          kubectl get svc -n tasky
+          echo "LoadBalancer URL:"
+          kubectl get svc tasky -n tasky -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"

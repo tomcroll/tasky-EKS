@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tasky-config
+  namespace: tasky
+data:
+  wizexercise.txt: |
+    This file was created as part of the Wiz GitOps Challenge.
+    The contents of this file can be accessed by the tasky application via the volume mount.
+    This deliberately insecure application is running with cluster-admin privileges.
