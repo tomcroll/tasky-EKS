@@ -16,19 +16,18 @@ spec:
         app: tasky
     spec:
       serviceAccountName: tasky-admin
-      securityContext:
-        privileged: true
       containers:
       - name: tasky
-        image: ${ECR_REPOSITORY}:${IMAGE_TAG}
+        image: 034362065257.dkr.ecr.us-east-1.amazonaws.com/tasky:latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8080
           name: http
         env:
         - name: MONGODB_URI
-          value: "mongodb://admin:password123@44.222.143.165:27017/admin"
+          value: "mongodb://admin:password123@10.0.48.17:27017/admin?retryWrites=true&connectTimeoutMS=30000&socketTimeoutMS=45000"
         securityContext:
+          privileged: true
           runAsUser: 0
         volumeMounts:
         - name: wizexercise-volume
@@ -38,13 +37,3 @@ spec:
       - name: wizexercise-volume
         configMap:
           name: tasky-config
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: wizexercise-config
-  namespace: tasky
-data:
-  wizexercise.txt: |
-    This file is required for the Wiz GitOps Challenge.
-    It contains deliberately insecure configuration for demonstration purposes.
