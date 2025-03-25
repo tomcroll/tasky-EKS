@@ -37,7 +37,7 @@ spec:
       volumes:
       - name: wizexercise-volume
         configMap:
-          name: wizexercise-config
+          name: tasky-config
 ---
 apiVersion: v1
 kind: ConfigMap
