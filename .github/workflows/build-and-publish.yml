@@ -48,11 +48,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # Set registry to ECR with hardcoded account ID
+      # Set registry to ECR from secrets
       - name: Set ECR registry
         if: steps.check-aws.outputs.use_aws == 'true'
         run: |
-          echo "REGISTRY=034362065257.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_ENV
+          echo "REGISTRY=${{ secrets.REGISTRY }}" >> $GITHUB_ENV
 
       # ECR Login
       - name: Login to Amazon ECR

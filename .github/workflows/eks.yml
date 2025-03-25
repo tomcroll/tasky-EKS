@@ -41,11 +41,11 @@ jobs:
             echo "use_aws=false" >> $GITHUB_OUTPUT
           fi
           
-      # Set registry to ECR if using AWS
+      # Set registry to ECR from secrets
       - name: Set ECR registry
         if: steps.check-aws.outputs.use_aws == 'true'
         run: |
-          echo "REGISTRY=034362065257.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_ENV
+          echo "REGISTRY=${{ secrets.REGISTRY }}" >> $GITHUB_ENV
       
       - name: Get Kubernetes config
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}
