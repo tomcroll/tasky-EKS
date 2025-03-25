@@ -9,9 +9,9 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: ${{ github.repository }}
+  ECR_REPOSITORY: tasky
   EKS_CLUSTER: wiz-gitops-wiz-challenge-eks
-  IMAGE_TAG: ${{ github.sha }}
+  IMAGE_TAG: ${{ github.event.workflow_run.head_sha }}
   REGISTRY: docker.io
 
 jobs:
@@ -45,8 +45,7 @@ jobs:
       - name: Set ECR registry
         if: steps.check-aws.outputs.use_aws == 'true'
         run: |
-          account_id=$(aws sts get-caller-identity --query Account --output text)
-          echo "REGISTRY=${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+          echo "REGISTRY=034362065257.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_ENV
       
       - name: Get Kubernetes config
         run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER }} --region ${{ env.AWS_REGION }}

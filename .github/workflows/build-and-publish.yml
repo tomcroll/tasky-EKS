@@ -11,7 +11,7 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: tasky
   IMAGE_TAG: ${{ github.sha }}
   AWS_REGION: us-east-1
 
@@ -48,26 +48,25 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # Set registry to ECR if using AWS
+      # Set registry to ECR with hardcoded account ID
       - name: Set ECR registry
         if: steps.check-aws.outputs.use_aws == 'true'
         run: |
-          account_id=$(aws sts get-caller-identity --query Account --output text)
-          echo "REGISTRY=${account_id}.dkr.ecr.${AWS_REGION}.amazonaws.com" >> $GITHUB_ENV
+          echo "REGISTRY=034362065257.dkr.ecr.us-east-1.amazonaws.com" >> $GITHUB_ENV
 
       # ECR Login
       - name: Login to Amazon ECR
         if: steps.check-aws.outputs.use_aws == 'true'
         uses: aws-actions/amazon-ecr-login@v2
 
-      # DockerHub Login
-      - name: Login to DockerHub
+      # DockerHub Login - fallback to GitHub packages if no Docker Hub credentials
+      - name: Login to DockerHub or GitHub Container Registry
         if: steps.check-aws.outputs.use_aws != 'true'
         uses: docker/login-action@v2
         with:
           registry: ${{ env.REGISTRY }}
-          username: ${{ secrets.DOCKER_USERNAME || github.actor }}
-          password: ${{ secrets.DOCKER_PASSWORD || secrets.GITHUB_TOKEN }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
