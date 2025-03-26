@@ -7,6 +7,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// Version of the application for tracking deployments
+const Version = "1.0.1-wiz-gitops-challenge"
+
 func index(c *gin.Context) {
 	c.HTML(http.StatusOK, "login.html", nil)
 }
