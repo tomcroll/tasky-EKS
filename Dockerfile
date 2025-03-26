@@ -14,5 +14,5 @@ COPY --from=build  /go/src/tasky/tasky .
 COPY --from=build  /go/src/tasky/assets ./assets
 # Add wizexercise.txt for security demonstration
 COPY --from=build  /go/src/tasky/wizexercise.txt .
-EXPOSE 8080
+EXPOSE 8079
 ENTRYPOINT ["/app/tasky"]
